@@ -1,0 +1,37 @@
+services:
+  server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: server
+    ports:
+      - "3030:3030"
+    networks:
+      - my-network
+    depends_on:
+      - db
+    env_file:
+      - .env
+    restart: unless-stopped
+
+  db:
+    image: postgres:16
+    container_name: db
+    environment:
+      POSTGRES_USER: my_user
+      POSTGRES_PASSWORD: my_password
+      POSTGRES_DB: social
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - my-network
+    ports:
+      - "5436:5432"
+    restart: unless-stopped
+
+networks:
+  my-network:
+    driver: bridge
+
+volumes:
+  postgres_data:

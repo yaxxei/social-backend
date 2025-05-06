@@ -1,0 +1,33 @@
+[package]
+name = "lib-core"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+# -- database
+sqlx = { version = "0.8.3", features = ["postgres", "macros", "json", "runtime-tokio", "uuid", "chrono"] }
+sea-query = { version = "0.32.1", features = ["with-uuid"] }
+sea-query-binder = { version = "0.7.0", features = ["sqlx-postgres", "with-uuid"] }
+
+# -- cache
+bb8 = "0.9.0"
+bb8-redis = "0.20.0"
+redis = "0.28.2"
+
+tracing = { workspace = true }
+tokio = { workspace = true }
+
+serde_json = "1.0.137"
+serde = { workspace = true }
+uuid = { workspace = true }
+chrono = { workspace = true }
+derive_more = { workspace = true }
+futures = { workspace = true }
+thiserror = { workspace = true }
+
+lib-auth = { path = "../lib-auth" }
+lib-utils = { path = "../lib-utils" }
+
+[dev-dependencies]
+dotenvy = "0.15.7"
+anyhow = "1"
