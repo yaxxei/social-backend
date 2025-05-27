@@ -14,7 +14,7 @@ use super::user_service::UserService;
 use crate::error::{Error, Result};
 use crate::services::user_service::UserDto;
 
-#[derive(Serialize)]
+#[derive(Serialize, Clone)]
 pub struct CommunityDto {
     pub id: Uuid,
     pub user_id: Uuid,
@@ -31,6 +31,35 @@ pub struct CommunityDto {
 pub struct CommunityService;
 
 impl CommunityService {
+    pub async fn get_meny_by_query(
+        db: &Db,
+        requester_id: Option<Uuid>,
+        query: &str,
+    ) -> Result<Vec<CommunityDto>> {
+        let communities = CommunityRepo::find_many_by_query(db, query)
+            .await?
+            .into_iter()
+            .map(|community| {
+                let db = db.clone();
+                async move {
+                    Self::check_access(
+                        &db,
+                        requester_id,
+                        Resource::Community {
+                            id: community.id,
+                            owner_id: community.user_id,
+                        },
+                        Action::Read,
+                    )
+                    .await?;
+
+                    Self::convert_to_dto(&db, community, requester_id).await
+                }
+            });
+
+        futures::future::try_join_all(communities).await
+    }
+
     #[instrument(skip(db))]
     pub async fn create(
         db: &Db,

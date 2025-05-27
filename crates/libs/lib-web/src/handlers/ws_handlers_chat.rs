@@ -13,7 +13,7 @@ use futures::{SinkExt as _, StreamExt as _};
 use lib_core::ctx::Ctx;
 use serde::{Deserialize, Serialize};
 use tokio::sync::{broadcast, mpsc};
-use tracing::{debug, error};
+use tracing::{debug, error, warn};
 use uuid::Uuid;
 
 use crate::services::chat_service::{ChatService, MessageDto};
@@ -82,24 +82,72 @@ pub async fn handle_chat_socket(
                         Ok(msg) => {
                             debug!("Sending message to all users in chat {:?}", msg);
 
-                            let conns = state_clone.chat_conns.lock().await;
-                            if let Some(users) = conns.get(&chat_id) {
-                                for conn in users {
-                                    if conn.user_id != user_id {
+                            // Получаем участников чата
+                            match ChatService::get_members(
+                                state_clone.mm.clone(),
+                                Ctx::new(user_id),
+                                &chat_id,
+                            )
+                            .await
+                            {
+                                Ok(members) => {
+                                    let mut chat_conns = state_clone.chat_conns.lock().await;
+                                    let mut notif_conns =
+                                        state_clone.notification_conns.lock().await;
+
+                                    for uid in members
+                                        .into_iter()
+                                        .filter(|user| user.id != user_id)
+                                        .map(|u| u.id)
+                                    {
                                         let outgoing = OutgoingWsMessage::NewMessage {
                                             message: msg.clone(),
                                         };
-                                        if let Ok(payload) = serde_json::to_string(&outgoing) {
-                                            if let Err(err) =
-                                                conn.sender.send(WsMessage::Text(payload.into()))
-                                            {
-                                                error!(
-                                                    "Failed to send message to user {}: {:?}",
-                                                    conn.user_id, err
+                                        let payload = serde_json::to_string(&outgoing).unwrap();
+
+                                        let chat_users = chat_conns.get(&chat_id);
+
+                                        let sent_via_chat = if let Some(users) = chat_users {
+                                            let mut sent = false;
+                                            for conn in users.iter().filter(|c| c.user_id == uid) {
+                                                if conn
+                                                    .sender
+                                                    .send(WsMessage::Text(payload.clone().into()))
+                                                    .is_ok()
+                                                {
+                                                    sent = true;
+                                                }
+                                            }
+                                            sent
+                                        } else {
+                                            false
+                                        };
+
+                                        if !sent_via_chat {
+                                            if let Some(notif_sender) = notif_conns.get_mut(&uid) {
+                                                if notif_sender
+                                                    .send(WsMessage::Text(payload.clone().into()))
+                                                    .await
+                                                    .is_ok()
+                                                {
+                                                    debug!(
+                                                        "Notification message sent to user {}",
+                                                        uid
+                                                    );
+                                                } else {
+                                                    warn!("Failed to send notification message to user {}", uid);
+                                                }
+                                            } else {
+                                                warn!(
+                                                    "User {} not connected to notification socket",
+                                                    uid
                                                 );
                                             }
                                         }
                                     }
+                                }
+                                Err(e) => {
+                                    error!("Failed to get chat members: {:?}", e);
                                 }
                             }
                         }
@@ -123,7 +171,7 @@ pub async fn handle_chat_socket(
         }
     }
 
-    debug!("User {user_id} disconnected from chat {chat_id}")
+    debug!("User {user_id} disconnected from chat {chat_id}");
 }
 
 #[derive(Debug, Deserialize)]
@@ -135,7 +183,10 @@ enum IncomingWsMessage {
 
 #[derive(Debug, Serialize)]
 #[serde(tag = "type")]
-enum OutgoingWsMessage {
+pub enum OutgoingWsMessage {
     #[serde(rename = "new_message")]
     NewMessage { message: MessageDto },
+
+    #[serde(rename = "user_added")]
+    UserAdded { nickname: String },
 }

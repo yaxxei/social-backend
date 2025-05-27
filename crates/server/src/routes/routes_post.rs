@@ -5,13 +5,12 @@ use axum::{
     routing::{delete, get, post, put},
     Router,
 };
-use lib_core::model::ModelManager;
 use lib_web::{
-    handlers::{handlers_comment, handlers_post},
+    handlers::{handlers_comment, handlers_post, AppState},
     middlewares,
 };
 
-pub async fn routes(mm: Arc<ModelManager>) -> Router {
+pub async fn routes(state: Arc<AppState>) -> Router {
     Router::new()
         .route("/", get(handlers_post::get_posts))
         .route("/", post(handlers_post::create_post))
@@ -29,6 +28,6 @@ pub async fn routes(mm: Arc<ModelManager>) -> Router {
             "/{post_id}/comments/{comment_id}",
             delete(handlers_comment::delete_comment),
         )
-        .with_state(mm)
+        .with_state(state)
         .layer(middleware::from_fn(middlewares::require_auth))
 }

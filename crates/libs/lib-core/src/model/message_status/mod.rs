@@ -11,6 +11,7 @@ use crate::error::Result;
 pub struct MessageStatusRepo {
     pub message_id: Uuid,
     pub user_id: Uuid,
+    pub chat_id: Uuid,
     pub is_send: bool,
     pub is_read: bool,
     pub read_at: Option<NaiveDateTime>,
@@ -20,6 +21,7 @@ pub struct MessageStatusRepo {
 pub struct MessageStatusForCreate {
     pub message_id: Uuid,
     pub user_id: Uuid,
+    pub chat_id: Uuid,
     pub is_send: bool,
     pub is_read: bool,
     pub read_at: Option<NaiveDateTime>,
@@ -36,6 +38,7 @@ pub struct MessageStatusForUpdate {
 pub struct MessageStatusForSelect {
     pub message_id: Option<Uuid>,
     pub user_id: Option<Uuid>,
+    pub chat_id: Option<Uuid>,
     pub is_read: Option<bool>,
 }
 

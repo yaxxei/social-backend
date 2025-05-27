@@ -63,6 +63,17 @@ impl UserRepo {
         select_many::<Self, _>(db, user_fs).await
     }
 
+    pub async fn find_many_by_query(db: &Db, query: &str) -> Result<Vec<UserRepo>> {
+        let q = format!("%{}%", query);
+
+        let users = sqlx::query_as("SELECT * FROM users WHERE nickname ILIKE $1")
+            .bind(&q)
+            .fetch_all(db)
+            .await?;
+
+        Ok(users)
+    }
+
     pub async fn delete(db: &Db, id: &Uuid) -> Result<()> {
         delete::<Self, _>(db, id).await
     }

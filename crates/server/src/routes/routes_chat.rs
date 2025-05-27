@@ -13,10 +13,18 @@ use lib_web::{
 pub async fn routes(state: Arc<AppState>) -> Router {
     Router::new()
         .route("/", get(handlers_chat::get_chats))
-        .route("/", post(async move || {}))
+        .route("/", post(handlers_chat::create_chat))
         .route("/{id}", get(handlers_chat::get_chat))
-        .route("/{id}", delete(async move || {}))
-        .route("/{id}", put(async move || {}))
+        .route("/{id}", put(handlers_chat::update_chat))
+        .route("/{id}", delete(handlers_chat::delete_chat))
+        .route("/{id}/get-members", get(handlers_chat::get_members))
+        .route(
+            "/{id}/add-user",
+            post(handlers_chat::add_user_to_group_chat),
+        )
+        .route("/has-chat", get(handlers_chat::has_chats_with_user))
+        // search
+        .route("/search", get(handlers_chat::search))
         // messages
         .route("/messages", get(handlers_messages::get_messages))
         .route("/messages", post(handlers_messages::create_message))

@@ -2,6 +2,9 @@ pub type Result<T> = core::result::Result<T, Error>;
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
+    #[error("Bad request: {0}")]
+    BadRequest(String),
+
     #[error("Wrong password")]
     WrongPassword,
 
@@ -70,6 +73,7 @@ impl Error {
             Error::CtxExt(_) => 401,
             Error::Ctx(_) => 401,
             Error::NoRequiredDataPassed => 400, // ?
+            Error::BadRequest(_) => 400,
         }
     }
 }

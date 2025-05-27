@@ -64,6 +64,17 @@ impl PostRepo {
         select_many::<Self, _>(db, user_post_fs).await
     }
 
+    pub async fn find_many_by_query(db: &Db, query: &str) -> Result<Vec<PostRepo>> {
+        let q = format!("%{}%", query);
+
+        let users = sqlx::query_as("SELECT * FROM posts WHERE title ILIKE $1")
+            .bind(&q)
+            .fetch_all(db)
+            .await?;
+
+        Ok(users)
+    }
+
     pub async fn delete(db: &Db, user_post_fd: PostForDelete) -> Result<()> {
         delete::<Self, _>(db, user_post_fd).await
     }

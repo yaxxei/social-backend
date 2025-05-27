@@ -15,15 +15,6 @@ pub async fn new_db_pool() -> sqlx::Result<Db> {
         .await
 }
 
-pub trait DbEntityOld {
-    type IdType: Into<sea_query::Value>;
-    const TABLE: &'static str;
-
-    fn table_ref() -> TableRef {
-        TableRef::Table(SeaRc::new(Alias::new(Self::TABLE)).into_iden())
-    }
-}
-
 pub trait DbEntity {
     const TABLE: &'static str;
 

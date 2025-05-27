@@ -15,7 +15,7 @@ use super::user_service::UserService;
 
 use crate::error::{Error, Result};
 
-#[derive(Serialize)]
+#[derive(Serialize, Clone)]
 pub struct PostDto {
     pub id: Uuid,
     pub user_id: Uuid,
@@ -35,6 +35,35 @@ pub struct PostDto {
 pub struct PostService;
 
 impl PostService {
+    pub async fn get_meny_by_query(
+        db: &Db,
+        requester_id: Option<Uuid>,
+        query: &str,
+    ) -> Result<Vec<PostDto>> {
+        let posts = PostRepo::find_many_by_query(db, query)
+            .await?
+            .into_iter()
+            .map(|post| {
+                let db = db.clone();
+                async move {
+                    Self::check_access(
+                        &db,
+                        requester_id,
+                        Resource::Post {
+                            id: post.id,
+                            author_id: post.user_id,
+                        },
+                        Action::Read,
+                    )
+                    .await?;
+
+                    Self::convert_to_dto(&db, requester_id, post).await
+                }
+            });
+
+        futures::future::try_join_all(posts).await
+    }
+
     pub async fn create(
         db: &Db,
         requester_id: Option<Uuid>,

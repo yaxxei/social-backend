@@ -15,7 +15,7 @@ use super::user_service::UserService;
 use crate::error::{Error, Result};
 use crate::services::user_service::UserDto;
 
-#[derive(Serialize)]
+#[derive(Serialize, Clone)]
 pub struct CommentDto {
     pub id: Uuid,
     pub post_id: Uuid,
@@ -32,7 +32,7 @@ pub struct CommentDto {
     pub post: CommentPost,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Clone)]
 pub struct CommentPost {
     pub id: Uuid,
     pub title: String,

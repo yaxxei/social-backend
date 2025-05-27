@@ -10,19 +10,12 @@ use validator::Validate;
 use crate::{
     error::Error,
     extractors::{CtxExt, ValidatedJson},
+    handlers::ws_handlers_chat::OutgoingWsMessage,
     services::chat_service::{ChatService, MessageDto},
     utils::response::ApiResponse,
 };
 
 use super::AppState;
-
-#[derive(Serialize)]
-struct NewMessageNotification {
-    event: String,
-    chat_id: Uuid,
-    from_user: Uuid,
-    content: String,
-}
 
 pub async fn get_message(
     State(state): State<Arc<AppState>>,
@@ -108,11 +101,8 @@ pub async fn create_message(
             Ok(msg) => {
                 info!("Message created: {}", msg.id);
                 if let Some(sender) = state.notification_conns.lock().await.get_mut(&user_id) {
-                    let notif = NewMessageNotification {
-                        event: "new_message".into(),
-                        chat_id: msg.chat_id,
-                        from_user: msg.sender_id,
-                        content: msg.content.clone(),
+                    let notif = OutgoingWsMessage::NewMessage {
+                        message: msg.clone(),
                     };
 
                     if sender
@@ -157,17 +147,15 @@ pub async fn create_message(
                     Ok(members) => {
                         for user_id in members
                             .into_iter()
-                            .filter(|uid| uid.ne(&requester_id))
+                            .filter(|user| user.id.ne(&requester_id))
+                            .map(|user| user.id)
                             .collect::<Vec<Uuid>>()
                         {
                             if let Some(sender) =
                                 state.notification_conns.lock().await.get_mut(&user_id)
                             {
-                                let notif = NewMessageNotification {
-                                    event: "new_message".into(),
-                                    chat_id,
-                                    from_user: msg.sender_id,
-                                    content: msg.content.clone(),
+                                let notif = OutgoingWsMessage::NewMessage {
+                                    message: msg.clone(),
                                 };
 
                                 if sender

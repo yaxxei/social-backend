@@ -16,6 +16,7 @@ pub mod handlers_messages;
 pub mod handlers_notification;
 pub mod handlers_post;
 pub mod handlers_profile;
+pub mod handlers_search;
 pub mod handlers_user;
 pub mod ws_handlers_chat;
 

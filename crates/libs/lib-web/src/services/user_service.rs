@@ -7,7 +7,7 @@ use uuid::Uuid;
 
 use crate::error::{Error, Result};
 
-#[derive(Serialize)]
+#[derive(Serialize, Clone)]
 pub struct UserDto {
     pub id: Uuid,
     pub nickname: String,
@@ -37,6 +37,15 @@ impl UserDto {
 pub struct UserService;
 
 impl UserService {
+    pub async fn get_meny_by_query(
+        db: &Db,
+        _requester_id: Option<Uuid>,
+        query: &str,
+    ) -> Result<Vec<UserDto>> {
+        let users = UserRepo::find_many_by_query(db, query).await?;
+        Ok(users.into_iter().map(UserDto::from_user).collect())
+    }
+
     /// Создание нового пользователя
     pub async fn create(
         db: &Db,

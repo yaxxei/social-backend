@@ -24,7 +24,7 @@ pub struct ChatForCreate {
 
 #[derive(Serialize, Default)]
 pub struct ChatForUpdate {
-    pub name: Option<Option<String>>,
+    pub name: Option<String>,
     pub is_group: Option<bool>,
 }
 
@@ -54,6 +54,17 @@ impl ChatRepo {
 
     pub async fn find_all(db: &Db, filter: ChatForSelect) -> Result<Vec<Self>> {
         select_many::<Self, _>(db, filter).await
+    }
+
+    pub async fn find_many_by_query(db: &Db, query: &str) -> Result<Vec<Self>> {
+        let q = format!("%{}%", query);
+
+        let users = sqlx::query_as("SELECT * FROM chats WHERE name ILIKE $1")
+            .bind(&q)
+            .fetch_all(db)
+            .await?;
+
+        Ok(users)
     }
 
     pub async fn delete(db: &Db, id: &Uuid) -> Result<()> {
