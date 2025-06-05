@@ -264,7 +264,7 @@ pub async fn add_user_to_group_chat(
     .await;
 
     match result {
-        Ok(nickname) => {
+        Ok((chat, user)) => {
             info!(
                 "User {:?} added to group chat {:?} successfully",
                 payload.user_id, chat_id
@@ -282,7 +282,8 @@ pub async fn add_user_to_group_chat(
                             state.notification_conns.lock().await.get_mut(&user_id)
                         {
                             let notif = OutgoingWsMessage::UserAdded {
-                                nickname: nickname.clone(),
+                                chat: chat.clone(),
+                                user: user.clone(),
                             };
 
                             if sender
@@ -292,12 +293,9 @@ pub async fn add_user_to_group_chat(
                                 .await
                                 .is_ok()
                             {
-                                debug!("message_updated notification sent to user: {}", user_id);
+                                debug!("user_added notification sent to user: {}", user_id);
                             } else {
-                                warn!(
-                                    "Failed sent notification message_updated to user: {}",
-                                    user_id
-                                );
+                                warn!("Failed sent notification user_added to user: {}", user_id);
                             }
                         } else {
                             warn!("Cannot get websocket connection to send notification");
@@ -311,6 +309,122 @@ pub async fn add_user_to_group_chat(
         }
         Err(err) => {
             error!("Failed to add user to group chat: {:?}", err);
+            ApiResponse::error(FAILED_MESSAGE, err)
+        }
+    }
+}
+
+pub async fn remove_user_from_group_chat(
+    State(state): State<Arc<AppState>>,
+    CtxExt(ctx): CtxExt,
+    Path(chat_id): Path<Uuid>,
+    ValidatedJson(payload): ValidatedJson<AddUserToGroupChatPayload>,
+) -> ApiResponse<()> {
+    const FAILED_MESSAGE: &str = "Failed to remove user from group chat";
+    info!(
+        "Removing user {:?} from group chat {:?} by user {:?}",
+        payload.user_id, chat_id, ctx.user_id
+    );
+
+    let requester_id = match ctx.user_id.ok_or(Error::Unauthorized) {
+        Ok(uid) => uid,
+        Err(e) => {
+            error!("Requester Unauthorized");
+            return ApiResponse::error(FAILED_MESSAGE, e);
+        }
+    };
+
+    let result = ChatService::remove_user_from_group_chat(
+        state.mm.clone(),
+        ctx.clone(),
+        &chat_id,
+        &payload.user_id,
+    )
+    .await;
+
+    match result {
+        Ok((chat, user)) => {
+            info!(
+                "User {:?} removed from group chat {:?} successfully",
+                payload.user_id, chat_id
+            );
+
+            let notif = OutgoingWsMessage::UserRemoved {
+                chat: chat.clone(),
+                user: user.clone(),
+            };
+
+            // Send notification to the removed user
+            if let Some(sender) = state
+                .notification_conns
+                .lock()
+                .await
+                .get_mut(&payload.user_id)
+            {
+                if sender
+                    .send(axum::extract::ws::Message::Text(
+                        serde_json::to_string(&notif).unwrap().into(),
+                    ))
+                    .await
+                    .is_ok()
+                {
+                    debug!(
+                        "user_removed notification sent to REMOVED user: {}",
+                        &payload.user_id
+                    );
+                } else {
+                    warn!(
+                        "Failed to send notification user_removed to REMOVED user: {}",
+                        &payload.user_id
+                    );
+                }
+            } else {
+                warn!("Cannot get websocket connection to REMOVED user");
+            }
+
+            // Send notification to other members of the chat
+            match ChatService::get_members(state.mm.clone(), ctx.clone(), &chat_id).await {
+                Ok(members) => {
+                    for user_id in members
+                        .into_iter()
+                        .filter(|user| user.id.ne(&requester_id))
+                        .map(|user| user.id)
+                        .collect::<Vec<Uuid>>()
+                    {
+                        if let Some(sender) =
+                            state.notification_conns.lock().await.get_mut(&user_id)
+                        {
+                            let notif = OutgoingWsMessage::UserRemoved {
+                                chat: chat.clone(),
+                                user: user.clone(),
+                            };
+
+                            if sender
+                                .send(axum::extract::ws::Message::Text(
+                                    serde_json::to_string(&notif).unwrap().into(),
+                                ))
+                                .await
+                                .is_ok()
+                            {
+                                debug!("user_removed notification sent to user: {}", &user_id);
+                            } else {
+                                warn!(
+                                    "Failed sent notification user_removed to user: {}",
+                                    &user_id
+                                );
+                            }
+                        } else {
+                            warn!("Cannot get websocket connection to send notification");
+                        }
+                    }
+                }
+                Err(_) => warn!("Cannot get chat members"),
+            }
+
+            ApiResponse::success(200, "User removed from group chat", None)
+        }
+        Err(err) => {
+            error!("Failed to remove user from group chat: {:?}", err);
             ApiResponse::error(FAILED_MESSAGE, err)
         }
     }

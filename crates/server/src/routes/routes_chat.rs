@@ -22,12 +22,17 @@ pub async fn routes(state: Arc<AppState>) -> Router {
             "/{id}/add-user",
             post(handlers_chat::add_user_to_group_chat),
         )
+        .route(
+            "/{id}/remove-user",
+            post(handlers_chat::remove_user_from_group_chat),
+        )
         .route("/has-chat", get(handlers_chat::has_chats_with_user))
         // search
         .route("/search", get(handlers_chat::search))
         // messages
         .route("/messages", get(handlers_messages::get_messages))
         .route("/messages", post(handlers_messages::create_message))
+        .route("/messages/read", post(handlers_messages::read_messages))
         .route("/messages/{id}", get(handlers_messages::get_message))
         .route("/messages/{id}", put(handlers_messages::update_message))
         .route("/messages/{id}", delete(handlers_messages::delete_message))

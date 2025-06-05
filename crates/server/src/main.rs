@@ -8,7 +8,7 @@ use lib_core::model::ModelManager;
 use lib_web::handlers::AppState;
 use routes::{
     routes_auth, routes_chat, routes_comment, routes_community, routes_like, routes_post,
-    routes_profile, routes_search, routes_user, routes_ws,
+    routes_profile, routes_report, routes_search, routes_user, routes_ws,
 };
 use tokio::sync::Mutex;
 use tower_http::cors::CorsLayer;
@@ -42,9 +42,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let chat_app = routes_chat::routes(state.clone()).await;
     let ws_app = routes_ws::routes(state.clone()).await;
     let search_app = routes_search::routes(state.clone()).await;
+    let report_app = routes_report::routes(state.clone()).await;
 
     let app = Router::new()
-        .route("/", axum::routing::get(handler))
+        .route("/", axum::routing::get(ping))
         .nest("/api/auth", auth_app)
         .nest("/api/users", user_app)
         .nest("/api/communities", community_app)
@@ -55,6 +56,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .nest("/api/chats", chat_app)
         .nest("/api/ws", ws_app)
         .nest("/api/search", search_app)
+        .nest("/api/reports", report_app)
         .layer(
             CorsLayer::new()
                 .allow_origin(HeaderValue::from_static("http://localhost:5173"))
@@ -83,6 +85,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-async fn handler() -> &'static str {
-    "Hello, world"
+async fn ping() -> &'static str {
+    "Pong!"
 }

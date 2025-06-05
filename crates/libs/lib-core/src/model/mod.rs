@@ -14,6 +14,7 @@ pub mod like;
 pub mod message;
 pub mod message_status;
 pub mod post;
+pub mod report;
 pub mod role;
 pub mod save;
 pub mod token;

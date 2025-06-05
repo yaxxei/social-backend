@@ -261,14 +261,22 @@ pub struct PostQuery {
 #[derive(Debug, Deserialize, Validate)]
 pub struct CreatePostPayload {
     community_id: Uuid,
-    #[validate(length(min = 1))]
+    #[validate(length(
+        min = 1,
+        max = 100,
+        message = "Title must be between 1 and 100 characters"
+    ))]
     title: String,
     content: String,
 }
 
 #[derive(Debug, Deserialize, Validate)]
 pub struct UpdatePostPayload {
-    #[validate(length(min = 1))]
+    #[validate(length(
+        min = 1,
+        max = 100,
+        message = "Title must be between 1 and 100 characters"
+    ))]
     title: Option<String>,
     content: Option<String>,
 }

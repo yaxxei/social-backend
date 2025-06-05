@@ -6,4 +6,5 @@ pub mod follow_service;
 pub mod like_service;
 pub mod post_service;
 pub mod profile_service;
+pub mod report_service;
 pub mod user_service;

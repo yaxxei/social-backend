@@ -133,6 +133,67 @@ pub async fn get_comment(
     ApiResponse::success(200, "Comment fetched successfully", Some(comment_response))
 }
 
+pub async fn get_comment_thread(
+    State(state): State<Arc<AppState>>,
+    CtxExt(ctx): CtxExt,
+    Path(comment_id): Path<Uuid>,
+) -> ApiResponse<CommentsResponse> {
+    const FAILED_MESSAGE: &str = "Failed to fetch comment thread";
+    info!("Starting to fetch comment thread: {}", comment_id);
+
+    // 1. Получаем исходный комментарий
+    let root_comment =
+        match CommentService::get_by_id(state.mm.db(), ctx.user_id, &comment_id).await {
+            Ok(comment) => comment,
+            Err(err) => {
+                error!("Failed to get root comment {}: {:?}", comment_id, err);
+                return ApiResponse::error(FAILED_MESSAGE, err);
+            }
+        };
+
+    // 2. Получаем все комментарии, связанные с этим постом (можно оптимизировать под потомков этого комментария)
+    let all_comments = match CommentService::get_many_by_post_id(
+        state.mm.db(),
+        ctx.user_id,
+        &root_comment.post_id,
+    )
+    .await
+    {
+        Ok(comments) => comments,
+        Err(err) => {
+            error!(
+                "Failed to fetch all comments for post {}: {:?}",
+                root_comment.post_id, err
+            );
+            return ApiResponse::error(FAILED_MESSAGE, err);
+        }
+    };
+
+    // 3. Фильтруем: берём только сам комментарий и все его потомки (по parent_comment_id)
+    let mut thread = Vec::new();
+    collect_thread(&mut thread, &root_comment.id, &all_comments);
+    thread.insert(0, root_comment); // Добавляем корневой комментарий первым
+
+    let response = CommentsResponse { comments: thread };
+
+    info!(
+        "Fetched thread with {} comments for root {}",
+        response.comments.len(),
+        comment_id
+    );
+    ApiResponse::success(200, "Comment thread fetched", Some(response))
+}
+
+fn collect_thread(acc: &mut Vec<CommentDto>, parent_id: &Uuid, all: &[CommentDto]) {
+    for comment in all
+        .iter()
+        .filter(|c| c.parent_comment_id.as_ref() == Some(parent_id))
+    {
+        acc.push(comment.clone());
+        collect_thread(acc, &comment.id, all); // рекурсивно ищем потомков
+    }
+}
+
 #[derive(Serialize)]
 #[serde(tag = "type")]
 pub enum OutgoingWsMessage {

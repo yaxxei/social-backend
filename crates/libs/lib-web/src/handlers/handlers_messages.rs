@@ -165,13 +165,10 @@ pub async fn create_message(
                                     .await
                                     .is_ok()
                                 {
-                                    debug!(
-                                        "message_updated notification sent to user: {}",
-                                        user_id
-                                    );
+                                    debug!("new_message notification sent to user: {}", user_id);
                                 } else {
                                     warn!(
-                                        "Failed sent notification message_updated to user: {}",
+                                        "Failed sent notification new_message to user: {}",
                                         user_id
                                     );
                                 }
@@ -254,11 +251,46 @@ pub async fn delete_message(
     ApiResponse::success(200, "Message deleted successully", Some(post_response))
 }
 
+pub async fn read_messages(
+    State(state): State<Arc<AppState>>,
+    CtxExt(ctx): CtxExt,
+    ValidatedJson(payload): ValidatedJson<ReadMessagesPayload>,
+) -> ApiResponse<()> {
+    const FAILED_MESSAGE: &str = "Failed to read messages";
+    info!(
+        "Starting to mark messages as read by user: {:?}",
+        ctx.user_id
+    );
+
+    for message_id in &payload.message_ids {
+        if let Err(err) = ChatService::read_message(state.mm.clone(), ctx.clone(), message_id).await
+        {
+            error!(
+                "Failed to read message {} by user {:?}: {}",
+                message_id, ctx.user_id, err
+            );
+            return ApiResponse::error(FAILED_MESSAGE, err);
+        }
+    }
+
+    info!(
+        "Messages marked as read successfully by user: {:?}",
+        ctx.user_id
+    );
+    ApiResponse::success(200, "Messages marked as read successfully", None)
+}
+
+#[derive(Debug, Deserialize, Validate)]
+pub struct ReadMessagesPayload {
+    #[validate(length(min = 1, message = "At least one message ID is required"))]
+    message_ids: Vec<Uuid>,
+}
+
 pub async fn read_message(
     State(state): State<Arc<AppState>>,
     CtxExt(ctx): CtxExt,
     Path(id): Path<Uuid>,
-) -> ApiResponse<MessageResposnse> {
+) -> ApiResponse<()> {
     const FAILED_MESSAGE: &str = "Failed to read message";
     info!("Starting read message by user: {:?}", ctx.user_id);
 

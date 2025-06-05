@@ -24,6 +24,7 @@ pub struct PostDto {
     pub content: String,
     pub created_at: NaiveDateTime,
     pub updated_at: NaiveDateTime,
+    pub is_deleted: bool,
     pub comments_count: u32,
     pub rating: i64,
     pub requester_like: Option<i16>,
@@ -118,6 +119,7 @@ impl PostService {
 
     pub async fn get_many(db: &Db, requester_id: Option<Uuid>) -> Result<Vec<PostDto>> {
         let post_fs = PostForSelect {
+            is_deleted: Some(false),
             ..Default::default()
         };
         let posts = PostRepo::find_many(db, post_fs)
@@ -157,6 +159,7 @@ impl PostService {
 
         let post_fs = PostForSelect {
             user_id,
+            is_deleted: Some(false),
             ..Default::default()
         };
         let posts = PostRepo::find_many(db, post_fs)
@@ -196,6 +199,7 @@ impl PostService {
 
         let post_fs = PostForSelect {
             community_id,
+            is_deleted: Some(false),
             ..Default::default()
         };
         let posts = PostRepo::find_many(db, post_fs)
@@ -273,7 +277,8 @@ impl PostService {
         .await?;
 
         let post_fd = PostForDelete { id: *id };
-        PostRepo::delete(db, post_fd).await.map_err(Error::Core)
+        let _ = PostRepo::delete(db, post_fd).await.map_err(Error::Core);
+        Ok(())
     }
 
     async fn check_access(
@@ -286,7 +291,7 @@ impl PostService {
             Some(id) => get_role(db, &id).await?,
             None => Role::Guest,
         };
-
+        // Ok(())
         AccessControl::check_access(role, resource, action, requester_id).map_err(|e| {
             warn!("{}", e.to_string());
             Error::Core(e.into())
@@ -306,6 +311,7 @@ impl PostService {
             content: post.content,
             created_at: post.created_at,
             updated_at: post.updated_at,
+            is_deleted: post.is_deleted,
             comments_count: CommentService::get_comments_count(db, requester_id, &post.id).await?,
             rating: LikeService::get_post_rating(db, requester_id, &post.id).await?,
             requester_like: LikeService::get_post_like(db, requester_id, &post.id).await?,

@@ -4,6 +4,7 @@ use axum::extract::{Path, Query, State};
 use lib_core::{
     ctx::Ctx,
     model::{
+        role::RoleEnum,
         user::{self},
         ModelManager,
     },
@@ -18,22 +19,40 @@ use crate::extractors::{CtxExt, ValidatedJson};
 use crate::services::user_service::{UserDto, UserService};
 use crate::utils::response::ApiResponse;
 
+#[derive(Deserialize)]
+pub struct UserQuery {
+    pub is_banned: Option<bool>,
+}
+
 pub async fn get_all_users(
     State(mm): State<Arc<ModelManager>>,
     CtxExt(ctx): CtxExt,
+    Query(params): Query<UserQuery>,
 ) -> ApiResponse<UsersResponse> {
     const FAILED_MESSAGE: &str = "Failed to register";
     info!("Starting fetching users");
 
-    let users = match UserService::get_all(mm.db(), ctx.user_id).await {
-        Ok(users) => {
-            info!("Users fetched successul");
-            users
-        }
-        Err(err) => {
-            error!("Failed to fetch users");
-            return ApiResponse::error(FAILED_MESSAGE, err);
-        }
+    let users = match params.is_banned {
+        Some(is_banned) => match UserService::get_banned(mm.db(), ctx.user_id).await {
+            Ok(users) => {
+                info!("Banned users fetched successul");
+                users
+            }
+            Err(err) => {
+                error!("Failed to fetch banned users");
+                return ApiResponse::error(FAILED_MESSAGE, err);
+            }
+        },
+        None => match UserService::get_all(mm.db(), ctx.user_id).await {
+            Ok(users) => {
+                info!("Users fetched successul");
+                users
+            }
+            Err(err) => {
+                error!("Failed to fetch users");
+                return ApiResponse::error(FAILED_MESSAGE, err);
+            }
+        },
     };
 
     let users_response = UsersResponse { users };
@@ -93,8 +112,9 @@ pub async fn update_user_profile(
         &user.id,
         payload.nickname,
         payload.email,
+        payload.role,
         None,
-        None,
+        payload.is_banned,
     )
     .await
     {
@@ -158,6 +178,10 @@ pub struct UserUpdatePayload {
 
     #[validate(email(message = "Invalid email format"))]
     email: Option<String>,
+
+    role: Option<RoleEnum>,
+
+    is_banned: Option<bool>,
 }
 
 #[derive(Serialize)]

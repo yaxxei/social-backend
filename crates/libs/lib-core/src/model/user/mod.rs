@@ -15,6 +15,7 @@ pub struct UserRepo {
     pub role: RoleEnum,
     pub email: String,
     pub hashed_password: String,
+    pub is_banned: bool,
     pub created_at: NaiveDateTime,
     pub updated_at: NaiveDateTime,
 }
@@ -32,6 +33,7 @@ pub struct UserForUpdate {
     pub email: Option<String>,
     pub role: Option<RoleEnum>,
     pub hashed_password: Option<String>,
+    pub is_banned: Option<bool>,
 }
 
 #[derive(Serialize, Default)]
@@ -40,6 +42,7 @@ pub struct UserForSelect {
     pub nickname: Option<String>,
     pub email: Option<String>,
     pub role: Option<RoleEnum>,
+    pub is_banned: Option<bool>,
 }
 
 impl DbEntity for UserRepo {

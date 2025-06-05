@@ -33,6 +33,13 @@ pub struct ChatMemberForUpdate {
 pub struct ChatMemberForSelect {
     pub chat_id: Option<Uuid>,
     pub user_id: Option<Uuid>,
+    pub role: Option<ChatRoleEnum>,
+}
+
+#[derive(Serialize, Default)]
+pub struct ChatMemberForDelete {
+    pub chat_id: Option<Uuid>,
+    pub user_id: Option<Uuid>,
 }
 
 impl DbEntity for ChatMemberRepo {
@@ -56,7 +63,7 @@ impl ChatMemberRepo {
         select_many::<Self, _>(db, filter).await
     }
 
-    pub async fn delete(db: &Db, id: &Uuid) -> Result<()> {
-        delete::<Self, _>(db, id).await
+    pub async fn delete(db: &Db, filter: ChatMemberForDelete) -> Result<()> {
+        delete::<Self, _>(db, filter).await
     }
 }

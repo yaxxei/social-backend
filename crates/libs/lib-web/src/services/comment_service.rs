@@ -288,7 +288,7 @@ impl CommentService {
             Some(id) => get_role(db, &id).await?,
             None => Role::Guest,
         };
-
+        // Ok(())
         AccessControl::check_access(role, resource, action, requester_id).map_err(|e| {
             warn!("{}", e.to_string());
             Error::Core(e.into())

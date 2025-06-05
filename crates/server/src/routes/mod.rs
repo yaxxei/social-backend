@@ -5,6 +5,7 @@ pub mod routes_community;
 pub mod routes_like;
 pub mod routes_post;
 pub mod routes_profile;
+pub mod routes_report;
 pub mod routes_search;
 pub mod routes_user;
 pub mod routes_ws;

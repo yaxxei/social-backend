@@ -87,7 +87,6 @@ impl MessageRepo {
     }
 
     pub async fn delete(db: &Db, id: &Uuid) -> Result<Self> {
-        // delete::<Self, _>(db, id).await
         let query = "UPDATE messages SET is_deleted = TRUE, content = '' WHERE id = $1";
         let message = sqlx::query_as(query).bind(id).fetch_one(db).await?;
         Ok(message)

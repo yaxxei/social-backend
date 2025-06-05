@@ -55,9 +55,14 @@ impl MessageStatusRepo {
         update::<Self, _>(db, id, data).await
     }
 
-    pub async fn read_message(db: &Db, msg_id: &Uuid) -> Result<()> {
-        let query = "UPDATE message_statuses SET is_read = TRUE WHERE message_id = $1";
-        let _ = sqlx::query(query).bind(msg_id).execute(db).await?;
+    pub async fn read_message(db: &Db, msg_id: &Uuid, user_id: &Uuid) -> Result<()> {
+        let query =
+            "UPDATE message_statuses SET is_read = TRUE WHERE message_id = $1 AND user_id = $2";
+        let _ = sqlx::query(query)
+            .bind(msg_id)
+            .bind(user_id)
+            .execute(db)
+            .await?;
 
         Ok(())
     }

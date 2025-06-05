@@ -2,17 +2,18 @@ use chrono::NaiveDateTime;
 use lib_core::db::Db;
 use lib_core::model::role::RoleEnum;
 use lib_core::model::user::{UserForCreate, UserForSelect, UserForUpdate, UserRepo};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use crate::error::{Error, Result};
 
-#[derive(Serialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct UserDto {
     pub id: Uuid,
     pub nickname: String,
     pub role: RoleEnum,
     pub email: String,
+    pub is_banned: bool,
     #[serde(skip)]
     pub hashed_password: String,
     pub created_at: NaiveDateTime,
@@ -29,6 +30,7 @@ impl UserDto {
             created_at: user.created_at,
             updated_at: user.updated_at,
             hashed_password: user.hashed_password,
+            is_banned: user.is_banned,
         }
     }
 }
@@ -126,6 +128,7 @@ impl UserService {
         email: Option<String>,
         role: Option<RoleEnum>,
         hashed_password: Option<String>,
+        is_banned: Option<bool>,
     ) -> Result<UserDto> {
         let user = UserRepo::update(
             db,
@@ -135,6 +138,7 @@ impl UserService {
                 email,
                 role,
                 hashed_password,
+                is_banned,
             },
         )
         .await?;
@@ -163,6 +167,19 @@ impl UserService {
             db,
             UserForSelect {
                 role: Some(role),
+                ..Default::default()
+            },
+        )
+        .await?;
+
+        Ok(users.into_iter().map(UserDto::from_user).collect())
+    }
+
+    pub async fn get_banned(db: &Db, _requester_id: Option<Uuid>) -> Result<Vec<UserDto>> {
+        let users = UserRepo::find_all(
+            db,
+            UserForSelect {
+                is_banned: Some(true),
                 ..Default::default()
             },
         )

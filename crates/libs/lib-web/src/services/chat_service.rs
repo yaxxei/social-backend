@@ -5,7 +5,9 @@ use lib_core::{
     ctx::Ctx,
     model::{
         chat::{ChatForCreate, ChatForSelect, ChatForUpdate, ChatRepo},
-        chat_member::{ChatMemberForCreate, ChatMemberForSelect, ChatMemberRepo},
+        chat_member::{
+            ChatMemberForCreate, ChatMemberForDelete, ChatMemberForSelect, ChatMemberRepo,
+        },
         chat_role::ChatRoleEnum,
         message::{MessageForCreate, MessageForSelect, MessageForUpdate, MessageRepo},
         message_status::{MessageStatusForCreate, MessageStatusForSelect, MessageStatusRepo},
@@ -20,7 +22,7 @@ use crate::error::{Error, Result};
 
 use super::user_service::{UserDto, UserService};
 
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ChatDto {
     pub id: Uuid,
     pub name: String,
@@ -41,6 +43,7 @@ pub struct MessageDto {
     pub content: String,
     pub created_at: NaiveDateTime,
     pub updated_at: NaiveDateTime,
+    pub is_edited: bool,
     pub is_deleted: bool,
     pub is_read: bool,
 }
@@ -136,6 +139,24 @@ impl ChatService {
         .await?;
 
         Self::convert_chat_to_dto(mm, ctx, chat).await
+    }
+
+    pub async fn get_chat_owner(
+        mm: Arc<ModelManager>,
+        ctx: Ctx,
+        chat_id: &Uuid,
+    ) -> Result<UserDto> {
+        let chat_member = ChatMemberRepo::find(
+            mm.db(),
+            ChatMemberForSelect {
+                chat_id: Some(*chat_id),
+                role: Some(ChatRoleEnum::Owner),
+                ..Default::default()
+            },
+        )
+        .await?;
+        let user = UserService::get_by_id(mm.db(), ctx.user_id, &chat_member.user_id).await?;
+        Ok(user.into())
     }
 
     pub async fn get_unread_count(mm: Arc<ModelManager>, ctx: Ctx, chat_id: &Uuid) -> Result<u32> {
@@ -329,7 +350,7 @@ impl ChatService {
         ctx: Ctx,
         chat_id: &Uuid,
         user_id: &Uuid,
-    ) -> Result<String> {
+    ) -> Result<(ChatDto, UserDto)> {
         let _ = ctx.user_id.ok_or(Error::Unauthorized)?;
 
         let chat = ChatRepo::find(
@@ -371,9 +392,62 @@ impl ChatService {
         )
         .await?;
 
-        Ok(UserService::get_by_id(mm.db(), ctx.user_id, user_id)
-            .await?
-            .nickname)
+        Ok((
+            Self::convert_chat_to_dto(mm.clone(), ctx.clone(), chat).await?,
+            UserService::get_by_id(mm.db(), ctx.user_id, user_id).await?,
+        ))
+    }
+
+    pub async fn remove_user_from_group_chat(
+        mm: Arc<ModelManager>,
+        ctx: Ctx,
+        chat_id: &Uuid,
+        user_id: &Uuid,
+    ) -> Result<(ChatDto, UserDto)> {
+        let _ = ctx.user_id.ok_or(Error::Unauthorized)?;
+
+        let chat = ChatRepo::find(
+            mm.db(),
+            ChatForSelect {
+                id: Some(*chat_id),
+                ..Default::default()
+            },
+        )
+        .await?;
+
+        if !chat.is_group {
+            return Err(Error::BadRequest(
+                "You can't remove users from a private chat".into(),
+            ));
+        }
+
+        let existing_members = ChatMemberRepo::find(
+            mm.db(),
+            ChatMemberForSelect {
+                chat_id: Some(*chat_id),
+                user_id: Some(*user_id),
+                ..Default::default()
+            },
+        )
+        .await?;
+
+        if existing_members.role == ChatRoleEnum::Owner {
+            let _ = Self::delete_chat(mm.clone(), ctx.clone(), chat_id).await?;
+        } else {
+            let _ = ChatMemberRepo::delete(
+                mm.db(),
+                ChatMemberForDelete {
+                    chat_id: Some(*chat_id),
+                    user_id: Some(*user_id),
+                },
+            )
+            .await?;
+        }
+
+        Ok((
+            Self::convert_chat_to_dto(mm.clone(), ctx.clone(), chat).await?,
+            UserService::get_by_id(mm.db(), ctx.user_id, user_id).await?,
+        ))
     }
 
     pub async fn create_private_chat(
@@ -508,9 +582,9 @@ impl ChatService {
     }
 
     pub async fn read_message(mm: Arc<ModelManager>, ctx: Ctx, id: &Uuid) -> Result<()> {
-        let _ = ctx.user_id.ok_or(Error::Unauthorized);
+        let user_id = ctx.user_id.ok_or(Error::Unauthorized)?;
 
-        let _ = MessageStatusRepo::read_message(mm.db(), id).await?;
+        let _ = MessageStatusRepo::read_message(mm.db(), id, &user_id).await?;
 
         Ok(())
     }
@@ -552,6 +626,7 @@ impl ChatService {
         ctx: Ctx,
         message: MessageRepo,
     ) -> Result<MessageDto> {
+        let user_id = ctx.user_id.ok_or(Error::Unauthorized)?;
         let sender_name = UserService::get_by_id(mm.db(), ctx.user_id, &message.sender_id)
             .await?
             .nickname;
@@ -560,6 +635,7 @@ impl ChatService {
             mm.db(),
             MessageStatusForSelect {
                 message_id: Some(message.id),
+                user_id: Some(user_id),
                 ..Default::default()
             },
         )
@@ -574,6 +650,7 @@ impl ChatService {
             content: message.content,
             created_at: message.created_at,
             updated_at: message.updated_at,
+            is_edited: message.created_at != message.updated_at,
             is_deleted: message.is_deleted,
             is_read,
         })
@@ -585,7 +662,7 @@ impl ChatService {
         chat: ChatRepo,
     ) -> Result<ChatDto> {
         let reqeuster_id = ctx.user_id.ok_or(Error::Unauthorized)?;
-        let unread_count = Self::get_unread_count(mm.clone(), ctx.clone(), &chat.id).await?;
+        let unread_count: u32 = Self::get_unread_count(mm.clone(), ctx.clone(), &chat.id).await?;
         let last_message = Self::get_last_message(mm.clone(), ctx.clone(), &chat.id).await?;
 
         let name = match chat.is_group {

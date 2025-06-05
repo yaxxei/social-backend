@@ -4,7 +4,12 @@ use sea_query::{Alias, SimpleExpr, Value};
 use serde::Serialize;
 use uuid::Uuid;
 
-use crate::model::{chat_role::ChatRoleEnum, role::RoleEnum, token::TokenTypeEnum};
+use crate::model::{
+    chat_role::ChatRoleEnum,
+    report::{ReportStatusType, ReportTargetType},
+    role::RoleEnum,
+    token::TokenTypeEnum,
+};
 
 pub fn prepare_sea_query_fields(fields: Vec<(String, Value)>) -> (Vec<Alias>, Vec<SimpleExpr>) {
     let columns = fields
@@ -23,6 +28,12 @@ pub fn prepare_sea_query_fields(fields: Vec<(String, Value)>) -> (Vec<Alias>, Ve
                         SimpleExpr::Value(value.to_owned()).cast_as(Alias::new("role_enum"))
                     } else if let Ok(_) = ChatRoleEnum::from_str(value_str) {
                         SimpleExpr::Value(value.to_owned()).cast_as(Alias::new("chat_role_enum"))
+                    } else if let Ok(_) = ReportTargetType::from_str(value_str) {
+                        SimpleExpr::Value(value.to_owned())
+                            .cast_as(Alias::new("report_target_type"))
+                    } else if let Ok(_) = ReportStatusType::from_str(value_str) {
+                        SimpleExpr::Value(value.to_owned())
+                            .cast_as(Alias::new("report_status_type"))
                     } else {
                         SimpleExpr::Value(value.to_owned())
                     }

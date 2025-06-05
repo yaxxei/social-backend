@@ -1,11 +1,11 @@
 use std::str::FromStr;
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use sqlx::Type;
 
 use crate::error::Error;
 
-#[derive(Debug, Serialize, Type, Clone, Copy)]
+#[derive(Debug, Deserialize, Serialize, Type, Clone, Copy)]
 #[sqlx(type_name = "role_enum")]
 #[serde(rename_all = "snake_case")]
 pub enum RoleEnum {

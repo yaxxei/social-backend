@@ -52,6 +52,9 @@ pub enum Error {
 
     #[error(transparent)]
     CtxExt(#[from] crate::extractors::CtxExtError),
+
+    #[error("{0}")]
+    Validation(String),
 }
 
 impl Error {
@@ -72,8 +75,9 @@ impl Error {
             Error::JsonValidation(_) => 422,
             Error::CtxExt(_) => 401,
             Error::Ctx(_) => 401,
-            Error::NoRequiredDataPassed => 400, // ?
+            Error::NoRequiredDataPassed => 400,
             Error::BadRequest(_) => 400,
+            Error::Validation(_) => 422,
         }
     }
 }
