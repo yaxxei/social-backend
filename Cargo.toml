@@ -2,7 +2,7 @@
 resolver = "2"
 members = [
     "crates/libs/lib-auth", 
-    "crates/libs/lib-core", "crates/libs/lib-notification",
+    "crates/libs/lib-core",
     "crates/libs/lib-utils",
     "crates/libs/lib-web",
     "crates/server",
